@@ -4,7 +4,7 @@ set(CMAKE_CXX_FLAGS "-Wall -std=c++11  ${EXTRA_FLAGS}")
 
 cmake_minimum_required(VERSION 3.0)
 
-project(duppatest)
+project(gpstest)
    
 
 set(SOURCES
@@ -18,22 +18,22 @@ set(SOURCES
 	)
 
  
-add_executable(duppatest ${SOURCES})
+add_executable(gpstest ${SOURCES})
 
 
-set_target_properties(duppatest PROPERTIES
+set_target_properties(gpstest PROPERTIES
 				CXX_STANDARD 17
 				CXX_EXTENSIONS OFF
 				)
  
-set_target_properties(duppatest PROPERTIES
-			OUTPUT_NAME "duppatest"
+set_target_properties(gpstest PROPERTIES
+			OUTPUT_NAME "gpstest"
 			)
 
 
-target_link_libraries(duppatest  PRIVATE  gpiod ${EXTRA_LIBS} )
+target_link_libraries(gpstest  PRIVATE  gpiod ${EXTRA_LIBS} )
 
-target_include_directories(duppatest
+target_include_directories(gpstest
 	PRIVATE
 	src
 )
