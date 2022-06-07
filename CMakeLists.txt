@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(gpstest)
    
+find_package(Threads)
 
 set(SOURCES
 	src/main.cpp
@@ -30,8 +31,10 @@ set_target_properties(gpstest PROPERTIES
 			OUTPUT_NAME "gpstest"
 			)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
-target_link_libraries(gpstest  PRIVATE  gpiod ${EXTRA_LIBS} )
+target_link_libraries(gpstest  PRIVATE   Threads::Threads  ${EXTRA_LIBS} )
 
 target_include_directories(gpstest
 	PRIVATE
