@@ -9,7 +9,7 @@ project(duppatest)
 
 set(SOURCES
 	src/main.cpp
-	src/GPSMgr.cpp
+	src/GPSmgr.cpp
 	src/MicroNMEA.cpp
 	src/tranmerc.cpp
 	src/utm.cpp
