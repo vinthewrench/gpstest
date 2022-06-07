@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "CommonDefs.hpp"
 #include "GPSmgr.hpp"
@@ -33,18 +34,25 @@ int main(int argc, const char * argv[]) {
 	
 	try {
 		int error = 0;
-
+		
 		if(!_gps.begin(GPSAddress, error))
 			throw Exception("failed to setup GPS ", error);
-
-		GPSLocation_t location;
-		if(_gps.GetLocation(location)){
-			string utm = GPSmgr::UTMString(location);
- 			
-			printf("UTM: %s\n", utm.c_str());
+		
+		
+		while(true){
+			
+			
+			GPSLocation_t location;
+			if(_gps.GetLocation(location)){
+				string utm = GPSmgr::UTMString(location);
+				
+				printf("UTM: %s\n", utm.c_str());
+				
+			}
+			sleep(1);
 			
 		}
-
+		
 		
 		_gps.stop();
 	}
