@@ -14,6 +14,7 @@ set(SOURCES
 	src/tranmerc.cpp
 	src/utm.cpp
 	src/I2C.cpp
+	src/ErrorMgr/cpp
 	)
 
  
