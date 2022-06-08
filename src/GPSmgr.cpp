@@ -271,6 +271,9 @@ void GPSmgr::GPSReader(){
 			}
 			
 		}
+		else {
+			usleep(100);
+		}
 	}
 }
 
