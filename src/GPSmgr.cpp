@@ -252,7 +252,6 @@ void GPSmgr::GPSReader(){
 		
 		
 		uint16_t len = 0;
-		
 		if(_i2cPort.readWord(UBLOX_BYTES_AVAIL, len) && len > 0){
 			
 			for(uint16_t i = 0; i < len; i++){

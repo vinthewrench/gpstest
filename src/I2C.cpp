@@ -95,7 +95,7 @@ bool I2C::begin(uint8_t	devAddr){
 
 
 bool I2C::begin(uint8_t	devAddr,   int &error){
-	static const char *ic2_device = "/dev/i2c-1";
+	static const char *ic2_device = "/dev/i2c-22";
  
 	_isSetup = false;
 	int fd ;
