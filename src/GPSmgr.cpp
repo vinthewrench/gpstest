@@ -272,7 +272,7 @@ void GPSmgr::GPSReader(){
 			
 		}
 		else {
-			usleep(100);
+			usleep(1000);
 		}
 	}
 }
