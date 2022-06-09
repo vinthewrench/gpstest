@@ -13,9 +13,6 @@
 #include <stdlib.h>
 #include <errno.h> // Error integer and strerror() function
 #include "ErrorMgr.hpp"
-//#include "GPSmgr.hpp"
-//#include "PiCarDB.hpp"
-//#include "PropValKeys.hpp"
 #include "utm.hpp"
 
 #ifndef PI
@@ -23,18 +20,216 @@
 #endif
 
 
+typedef void * (*THREADFUNCPTR)(void *);
+
+// MARK: -  SERIAL GPS
+#if USE_SERIAL_GPS
+/* add a fd to fd_set, and update max_fd */
+static int safe_fd_set(int fd, fd_set* fds, int* max_fd) {
+	 assert(max_fd != NULL);
+
+	 FD_SET(fd, fds);
+	 if (fd > *max_fd) {
+		  *max_fd = fd;
+	 }
+	 return 0;
+}
+
+/* clear fd from fds, update max fd if needed */
+static int safe_fd_clr(int fd, fd_set* fds, int* max_fd) {
+	 assert(max_fd != NULL);
+
+	 FD_CLR(fd, fds);
+	 if (fd == *max_fd) {
+		  (*max_fd)--;
+	 }
+	 return 0;
+}
+
+
+GPSmgr::GPSmgr() : _nmea( (void*)_nmeaBuffer, sizeof(_nmeaBuffer), this ){
+	_isSetup = false;
+ 
+	FD_ZERO(&_master_fds);
+	_max_fds = 0;
+	
+	_ttyPath = NULL;
+	_ttySpeed = B0;
+
+	_fd = -1;
+//	_nmea.setBuffer( (void*)_nmeaBuffer, sizeof(_nmeaBuffer));
+	_nmea.clear();
+	
+	_isRunning = true;
+
+	pthread_create(&_TID, NULL,
+										  (THREADFUNCPTR) &GPSmgr::GPSReaderThread, (void*)this);
+
+	
+}
+
+GPSmgr::~GPSmgr(){
+	stop();
+	
+	pthread_mutex_lock (&_mutex);
+	_isRunning = false;
+	pthread_cond_signal(&_cond);
+	pthread_mutex_unlock (&_mutex);
+
+	pthread_join(_TID, NULL);
+
+	FD_ZERO(&_master_fds);
+	_max_fds = 0;
+
+}
+
+
+
+bool GPSmgr::begin(const char* path, speed_t speed){
+	int error = 0;
+	
+	return begin(path, speed, error);
+}
+
+
+bool GPSmgr::begin(const char* path, speed_t speed,  int &error){
+
+	if(isConnected())
+		return true;
+	
+	_isSetup = false;
+	
+	if(_ttyPath){
+		free((void*) _ttyPath); _ttyPath = NULL;
+	}
+
+	pthread_mutex_lock (&_mutex);
+	_ttyPath = strdup(path);
+	_ttySpeed = speed;
+	pthread_mutex_unlock (&_mutex);
+
+	reset();
+	_nmea.clear();
+	 
+	{
+		int ignoreError;
+		openGPSPort(ignoreError);
+	}
+ 
+	_isSetup = true;
+
+	return _isSetup;
+}
+
+bool GPSmgr::openGPSPort( int &error){
+
+	if(!_ttyPath  || _ttySpeed == B0) {
+		error = EINVAL;
+		return false;
+	}
+	
+	struct termios options;
+	
+	int fd ;
+	
+	if((fd = ::open( _ttyPath, O_RDWR | O_NOCTTY | O_NONBLOCK | O_NDELAY  )) <0) {
+	//	ELOG_ERROR(ErrorMgr::FAC_GPS, 0, errno, "OPEN %s", _ttyPath);
+		error = errno;
+		return false;
+	}
+	
+	fcntl(fd, F_SETFL, 0);      // Clear the file status flags
+	
+	// Back up current TTY settings
+	if( tcgetattr(fd, &_tty_opts_backup)<0) {
+		ELOG_ERROR(ErrorMgr::FAC_GPS, 0, errno, "tcgetattr %s", _ttyPath);
+		error = errno;
+		return false;
+	}
+	
+	cfmakeraw(&options);
+	options.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
+	options.c_cflag &= ~CSTOPB; // Clear stop field, only one stop bit used in communication (most common)
+	options.c_cflag &= ~CSIZE; // Clear all bits that set the data size
+	options.c_cflag |= CS8; // 8 bits per byte (most common)
+	// options.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control 	options.c_cflag |=  CRTSCTS; // Disable RTS/CTS hardware flow control (most common)
+	options.c_cflag |=  CRTSCTS; // DCTS flow control of output
+	options.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
+	
+	options.c_lflag &= ~ICANON;
+	options.c_lflag &= ~ECHO; // Disable echo
+	options.c_lflag &= ~ECHOE; // Disable erasure
+	options.c_lflag &= ~ECHONL; // Disable new-line echo
+	options.c_lflag &= ~ISIG; // Disable interpretation of INTR, QUIT and SUSP
+	options.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
+	options.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
+	
+	options.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
+	options.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
+	
+	cfsetospeed (&options, _ttySpeed);
+	cfsetispeed (&options, _ttySpeed);
+	
+	if (tcsetattr(fd, TCSANOW, &options) < 0){
+		ELOG_ERROR(ErrorMgr::FAC_GPS, 0, errno, "Unable to tcsetattr %s", _ttyPath);
+		error = errno;
+		return false;
+	}
+	
+	pthread_mutex_lock (&_mutex);
+	_fd = fd;
+	// add to read set
+	safe_fd_set(_fd, &_master_fds, &_max_fds);
+	pthread_mutex_unlock (&_mutex);
+
+	return true;
+}
+
+void GPSmgr::closeGPSPort(){
+	if(isConnected()){
+		
+		pthread_mutex_lock (&_mutex);
+
+		// Restore previous TTY settings
+		tcsetattr(_fd, TCSANOW, &_tty_opts_backup);
+		close(_fd);
+		safe_fd_clr(_fd, &_master_fds, &_max_fds);
+		_fd = -1;
+		pthread_mutex_unlock (&_mutex);
+	}
+}
+
+bool  GPSmgr::isConnected() {
+	bool val = false;
+	
+	pthread_mutex_lock (&_mutex);
+	val = _fd != -1;
+	pthread_mutex_unlock (&_mutex);
+ 
+	return val;
+};
+
+void GPSmgr::stop(){
+	
+	if(_isSetup) {
+		closeGPSPort();
+		_isSetup = false;
+		}
+}
+
+#else
+// MARK: -  I2C GPS
 enum UBLOX_Register
 {
   UBLOX_BYTES_AVAIL  = 0xFD,
   UBLOX_DATA_STREAM = 0xFF,
 };
 
- 
-typedef void * (*THREADFUNCPTR)(void *);
 
 GPSmgr::GPSmgr() : _nmea( (void*)_nmeaBuffer, sizeof(_nmeaBuffer), this ){
 	_isSetup = false;
 	_shouldRead = false;
+
 	_nmea.clear();
 	
 	_isRunning = true;
@@ -51,6 +246,7 @@ GPSmgr::~GPSmgr(){
 	pthread_mutex_lock (&_mutex);
 	_isRunning = false;
 	_shouldRead = false;
+
 	pthread_cond_signal(&_cond);
 	pthread_mutex_unlock (&_mutex);
 	pthread_join(_TID, NULL);
@@ -69,7 +265,9 @@ bool GPSmgr::begin(uint8_t deviceAddress,   int &error){
 	_nmea.clear();
 	_shouldRead = false;
 
-	if( _i2cPort.begin(deviceAddress, error) ){
+	static const char *ic2_device = "/dev/i2c-22";
+
+	if(  _i2cPort.begin(deviceAddress, ic2_device, error) ){
 			_isSetup = true;
 	}
 	
@@ -94,7 +292,6 @@ bool  GPSmgr::isConnected() {
 	return _isSetup;
 };
 
- 
 bool GPSmgr::setShouldRead(bool shouldRead){
 	if(_isSetup && _isRunning){
 		_shouldRead = true;
@@ -103,6 +300,10 @@ bool GPSmgr::setShouldRead(bool shouldRead){
 	return false;
 }
 
+
+#endif
+
+// MARK: -
 
 bool GPSmgr::reset(){
 
@@ -250,18 +451,93 @@ static void  UnknownSentenceHandler(MicroNMEA & nmea, void *context){
 
 
 void GPSmgr::GPSReader(){
-	
+	 
 	_nmea.setUnknownSentenceHandler(UnknownSentenceHandler);
- 
+		
 	while(_isRunning){
+		
+		
+#if USE_SERIAL_GPS
+		// if not setup // check back later
+		if(!_isSetup){
+			sleep(2);
+			continue;
+		}
+
+		int lastError = 0;
+
+		// is the port setup yet?
+		if (! isConnected()){
+			if(!openGPSPort(lastError)){
+				sleep(5);
+				continue;
+			}
+		}
+	 
+		/* wait for something to happen on the socket */
+		struct timeval selTimeout;
+		selTimeout.tv_sec = 0;       /* timeout (secs.) */
+		selTimeout.tv_usec = 100;            /* 100 microseconds */
+		
+		/* back up master */
+		fd_set dup = _master_fds;
+		
+		int numReady = select(_max_fds+1, &dup, NULL, NULL, &selTimeout);
+		if( numReady == -1 ) {
+			perror("select");
+		}
+		
+		if ((_fd != -1)  && FD_ISSET(_fd, &dup)) {
+			
+			bool readMore = false;
+			
+			do{
+				readMore = false;
+				
+				u_int8_t c;
+				size_t nbytes =  (size_t)::read( _fd, &c, 1 );
+				
+				if(nbytes == 1){
+					readMore = true;
+					if(_nmea.process(c)){
+						processNMEA();
+					}
+				}
+				else if( nbytes == 0) {
+					continue;
+				}
+				else if( nbytes == -1) {
+					int lastError = errno;
+					
+					// no data try later
+					if(lastError == EAGAIN)
+						continue;
+					
+					if(lastError == ENXIO){  // device disconnected..
+						
+						ELOG_ERROR(ErrorMgr::FAC_GPS, 0, errno, "GPS disconnectd", _ttyPath);
+						
+						closeGPSPort();
+						continue;
+					}
+					
+					else {
+						perror("read");
+					}
+				}
+			} while (readMore);
+			
+		}
+		
+#else
 		
 		// if not setup // check back later
 		if(!_shouldRead ){
 			sleep(1);
 			continue;
 		}
-  
-#if 1
+
+#if UBLOX_CURRENT_ADDRESS_READ
 		uint8_t b;
 		
 		if(_i2cPort.readByte(b)){
@@ -276,9 +552,8 @@ void GPSmgr::GPSReader(){
 			}
 		}
 		else {
-			printf("read from GPS failed\n");
+			ELOG_ERROR(ErrorMgr::FAC_GPS, 0, errno, "GPS I2C READ FAILED");
 			_shouldRead = false;
-			
 		}
 
 #else
@@ -308,6 +583,7 @@ void GPSmgr::GPSReader(){
 			usleep(1000);
 		}
 		
+#endif
 #endif
 		
 	}

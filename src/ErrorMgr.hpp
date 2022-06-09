@@ -51,7 +51,8 @@ public:
 		FAC_AUDIO,
 		FAC_RTL,
 		FAC_DB,
-	 	}facility_t;
+		FAC_GPS,
+		}facility_t;
 	
 	
 	static ErrorMgr *shared() {

@@ -28,7 +28,8 @@ public:
 	~I2C();
 	
 	bool begin(uint8_t	devAddr);
- 	bool begin(uint8_t	devAddr,  int &error);
+	bool begin(uint8_t	devAddr,  int &error);
+	bool begin(uint8_t	devAddr,  const char *path, int &error);
 
 	void stop();
 
@@ -42,12 +43,17 @@ public:
 
 	bool readByte(uint8_t& byte);	// simple 1 byte read
 	bool readByte(uint8_t regAddr,  uint8_t& byte);
+	
 	bool readWord(uint8_t regAddr,  uint16_t& word, bool swap = false);
 	bool readWord(uint8_t regAddr,  int16_t& word, bool swap = false);
 
 	
 	bool readBlock(uint8_t regAddr, uint8_t size, i2c_block_t & block );
 	bool writeBlock(uint8_t regAddr, uint8_t size, i2c_block_t block );
+
+	// stupid c++ alternative version
+	bool readByte(uint8_t regAddr,  unsigned char * byte);
+	bool readBlock(uint8_t regAddr, uint8_t size, unsigned char * block );
 
 private:
 
