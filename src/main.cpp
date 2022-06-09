@@ -38,6 +38,7 @@ int main(int argc, const char * argv[]) {
 		if(!_gps.begin(GPSAddress, error))
 			throw Exception("failed to setup GPS ", error);
 		
+		_gps.setShouldRead(true);
 		
 		while(true){
 			

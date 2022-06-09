@@ -34,6 +34,7 @@ typedef void * (*THREADFUNCPTR)(void *);
 
 GPSmgr::GPSmgr() : _nmea( (void*)_nmeaBuffer, sizeof(_nmeaBuffer), this ){
 	_isSetup = false;
+	_shouldRead = false;
 	_nmea.clear();
 	
 	_isRunning = true;
@@ -49,6 +50,7 @@ GPSmgr::~GPSmgr(){
 	
 	pthread_mutex_lock (&_mutex);
 	_isRunning = false;
+	_shouldRead = false;
 	pthread_cond_signal(&_cond);
 	pthread_mutex_unlock (&_mutex);
 	pthread_join(_TID, NULL);
@@ -65,8 +67,9 @@ bool GPSmgr::begin(uint8_t deviceAddress,   int &error){
 	
 	reset();
 	_nmea.clear();
+	_shouldRead = false;
 
-	if(  _i2cPort.begin(deviceAddress, error) ){
+	if( _i2cPort.begin(deviceAddress, error) ){
 			_isSetup = true;
 	}
 	
@@ -92,6 +95,14 @@ bool  GPSmgr::isConnected() {
 };
 
  
+bool GPSmgr::setShouldRead(bool shouldRead){
+	if(_isSetup && _isRunning){
+		_shouldRead = true;
+		return true;
+	}
+	return false;
+}
+
 
 bool GPSmgr::reset(){
 
@@ -245,35 +256,35 @@ void GPSmgr::GPSReader(){
 	while(_isRunning){
 		
 		// if not setup // check back later
-		if(!_isSetup){
-			sleep(2);
+		if(!_shouldRead ){
+			sleep(1);
 			continue;
 		}
+  
+#if 1
 		
+#else
+		uint8_t b;
 		
-		uint16_t len = 0;
-		if(_i2cPort.readWord(UBLOX_BYTES_AVAIL, len)
-			&& (len > 0) && (len != 0xffff)){
-			
-			for(uint16_t i = 0; i < len; i++){
-				uint8_t b;
-				
-				if(i == 0){
-					if(! _i2cPort.readByte(UBLOX_DATA_STREAM, b)) break;
-				}
-				else {
-					if(! _i2cPort.readByte(b)) break;
-				}
-				
+		if(_i2cPort.readByte(b)){
+			if(b == 0xff){
+				// not ready.. wait a bit
+				usleep(1000);
+			}
+			else {
 				if(_nmea.process(b)){
 					processNMEA();
 				}
 			}
-			
 		}
 		else {
-			usleep(1000);
+			printf("read from GPS failed\n");
+			_shouldRead = false;
+			
 		}
+		
+#endif
+		
 	}
 }
 

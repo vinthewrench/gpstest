@@ -115,9 +115,11 @@ public:
 	bool GetLocation(GPSLocation_t& location);
 	static string UTMString(GPSLocation_t location);
 	static string NavString(char navSystem );
-	
 	bool GetVelocity(GPSVelocity_t & velocity);
 	
+	bool setShouldRead(bool shouldRead);
+	bool shouldRead() {return _shouldRead;};
+
 	
 	
 private:
@@ -136,7 +138,8 @@ private:
 	static void* GPSReaderThread(void *context);
 	static void GPSReaderThreadCleanup(void *context);
 	bool 			_isRunning = false;
-  
+	bool			_shouldRead = false;
+	
 
   pthread_cond_t 		_cond = PTHREAD_COND_INITIALIZER;
   pthread_mutex_t 	_mutex = PTHREAD_MUTEX_INITIALIZER;
