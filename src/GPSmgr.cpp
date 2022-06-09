@@ -262,8 +262,6 @@ void GPSmgr::GPSReader(){
 		}
   
 #if 1
-		
-#else
 		uint8_t b;
 		
 		if(_i2cPort.readByte(b)){
@@ -281,6 +279,33 @@ void GPSmgr::GPSReader(){
 			printf("read from GPS failed\n");
 			_shouldRead = false;
 			
+		}
+
+#else
+ 
+		
+		uint16_t len = 0;
+		if(_i2cPort.readWord(UBLOX_BYTES_AVAIL, len)
+			&& (len > 0) && (len != 0xffff)){
+			
+			for(uint16_t i = 0; i < len; i++){
+				uint8_t b;
+				
+				if(i == 0){
+					if(! _i2cPort.readByte(UBLOX_DATA_STREAM, b)) break;
+				}
+				else {
+					if(! _i2cPort.readByte(b)) break;
+				}
+				
+				if(_nmea.process(b)){
+					processNMEA();
+				}
+			}
+			
+		}
+		else {
+			usleep(1000);
 		}
 		
 #endif
