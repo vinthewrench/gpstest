@@ -267,7 +267,7 @@ void GPSmgr::GPSReader(){
 		if(_i2cPort.readByte(b)){
 			if(b == 0xff){
 				// not ready.. wait a bit
-				usleep(1000);
+				usleep(10000);
 			}
 			else {
 				if(_nmea.process(b)){
