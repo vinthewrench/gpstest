@@ -18,15 +18,7 @@
 #include "CommonDefs.hpp"
 #include "GPSmgr.hpp"
 
-#if defined(__APPLE__)
-const char* path_gps  = "/dev/cu.usbmodem14101";
-#else
-const char* path_gps  = "/dev/ttyACM0";
-#endif
 
-
-
-constexpr uint8_t  GPSAddress = 0x42;
 
 int main(int argc, const char * argv[]) {
 
@@ -34,12 +26,26 @@ int main(int argc, const char * argv[]) {
 	
 	try {
 		int error = 0;
+#if USE_SERIAL_GPS
 		
+#if defined(__APPLE__)
+		const char* path_gps  = "/dev/cu.usbmodem14101";
+#else
+		const char* path_gps  = "/dev/ttyAMA1";
+#endif
+		
+		if(!_gps.begin(path_gps, B38400, error))
+			throw Exception("failed to setup GPS.  error: %d", error);
+#else
+		constexpr uint8_t  GPSAddress = 0x42;
 		if(!_gps.begin(GPSAddress, error))
-			throw Exception("failed to setup GPS ", error);
-		
-		_gps.setShouldRead(true);
-		
+			printf("failed to setup GPS %d ", error);
+#endif
+
+#if !USE_SERIAL_GPS
+		gps->setShouldRead(true);
+#endif
+
 		while(true){
 			
 			

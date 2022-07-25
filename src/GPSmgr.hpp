@@ -7,7 +7,6 @@
 
 #pragma once
 
- 
 
 #include <mutex>
 #include <utility>      // std::pair, std::make_pair
@@ -22,6 +21,8 @@
 #include <unistd.h>
 #include <pthread.h>
  
+#define USE_SERIAL_GPS 1
+
 #if USE_SERIAL_GPS
 #include <termios.h>
 #else
