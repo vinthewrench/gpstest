@@ -21,12 +21,11 @@
 
 
 int main(int argc, const char * argv[]) {
-
+	
 	GPSmgr _gps;
 	
 	try {
 		int error = 0;
-#if USE_SERIAL_GPS
 		
 #if defined(__APPLE__)
 		const char* path_gps  = "/dev/cu.usbmodem14101";
@@ -36,16 +35,8 @@ int main(int argc, const char * argv[]) {
 		
 		if(!_gps.begin(path_gps, B38400, error))
 			throw Exception("failed to setup GPS.  error: %d", error);
-#else
-		constexpr uint8_t  GPSAddress = 0x42;
-		if(!_gps.begin(GPSAddress, error))
-			printf("failed to setup GPS %d ", error);
-#endif
-
-#if !USE_SERIAL_GPS
-		gps->setShouldRead(true);
-#endif
-
+		
+		
 		while(true){
 			
 			
@@ -61,7 +52,7 @@ int main(int argc, const char * argv[]) {
 		}
 		
 		
-		_gps.stop();
+//		_gps.stop();
 	}
 	
 	catch ( const Exception& e)  {

@@ -23,7 +23,6 @@
 typedef void * (*THREADFUNCPTR)(void *);
 
 // MARK: -  SERIAL GPS
-#if USE_SERIAL_GPS
 /* add a fd to fd_set, and update max_fd */
 static int safe_fd_set(int fd, fd_set* fds, int* max_fd) {
 	 assert(max_fd != NULL);
@@ -47,7 +46,7 @@ static int safe_fd_clr(int fd, fd_set* fds, int* max_fd) {
 }
 
 
-GPSmgr::GPSmgr() : _nmea( (void*)_nmeaBuffer, sizeof(_nmeaBuffer), this ){
+GPSmgr::GPSmgr() {
 	_isSetup = false;
  
 	FD_ZERO(&_master_fds);
@@ -57,10 +56,7 @@ GPSmgr::GPSmgr() : _nmea( (void*)_nmeaBuffer, sizeof(_nmeaBuffer), this ){
 	_ttySpeed = B0;
 
 	_fd = -1;
-//	_nmea.setBuffer( (void*)_nmeaBuffer, sizeof(_nmeaBuffer));
-	_nmea.clear();
-	
-	_isRunning = true;
+ 	_isRunning = true;
 
 	pthread_create(&_TID, NULL,
 										  (THREADFUNCPTR) &GPSmgr::GPSReaderThread, (void*)this);
@@ -109,8 +105,6 @@ bool GPSmgr::begin(const char* path, speed_t speed,  int &error){
 	pthread_mutex_unlock (&_mutex);
 
 	reset();
-	_nmea.clear();
-	 
 	{
 		int ignoreError;
 		openGPSPort(ignoreError);
@@ -152,8 +146,8 @@ bool GPSmgr::openGPSPort( int &error){
 	options.c_cflag &= ~CSTOPB; // Clear stop field, only one stop bit used in communication (most common)
 	options.c_cflag &= ~CSIZE; // Clear all bits that set the data size
 	options.c_cflag |= CS8; // 8 bits per byte (most common)
-	// options.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control 	options.c_cflag |=  CRTSCTS; // Disable RTS/CTS hardware flow control (most common)
-	options.c_cflag |=  CRTSCTS; // DCTS flow control of output
+	options.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control
+//	options.c_cflag |=  CRTSCTS; // DCTS flow control of output
 	options.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
 	
 	options.c_lflag &= ~ICANON;
@@ -162,7 +156,7 @@ bool GPSmgr::openGPSPort( int &error){
 	options.c_lflag &= ~ECHONL; // Disable new-line echo
 	options.c_lflag &= ~ISIG; // Disable interpretation of INTR, QUIT and SUSP
 	options.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
-	options.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
+ 	options.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
 	
 	options.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
 	options.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
@@ -217,91 +211,6 @@ void GPSmgr::stop(){
 		}
 }
 
-#else
-// MARK: -  I2C GPS
-enum UBLOX_Register
-{
-  UBLOX_BYTES_AVAIL  = 0xFD,
-  UBLOX_DATA_STREAM = 0xFF,
-};
-
-
-GPSmgr::GPSmgr() : _nmea( (void*)_nmeaBuffer, sizeof(_nmeaBuffer), this ){
-	_isSetup = false;
-	_shouldRead = false;
-
-	_nmea.clear();
-	
-	_isRunning = true;
-
-	pthread_create(&_TID, NULL,
-										  (THREADFUNCPTR) &GPSmgr::GPSReaderThread, (void*)this);
-
-	
-}
-
-GPSmgr::~GPSmgr(){
-	stop();
-	
-	pthread_mutex_lock (&_mutex);
-	_isRunning = false;
-	_shouldRead = false;
-
-	pthread_cond_signal(&_cond);
-	pthread_mutex_unlock (&_mutex);
-	pthread_join(_TID, NULL);
- }
-
-
-bool GPSmgr::begin(uint8_t deviceAddress){
-	int error = 0;
-
-	return begin(deviceAddress, error);
-}
- 
-bool GPSmgr::begin(uint8_t deviceAddress,   int &error){
-	
-	reset();
-	_nmea.clear();
-	_shouldRead = false;
-
-	static const char *ic2_device = "/dev/i2c-22";
-
-	if(  _i2cPort.begin(deviceAddress, ic2_device, error) ){
-			_isSetup = true;
-	}
-	
-	return _isSetup;
-}
- 
-void GPSmgr::stop(){
-	_isSetup = false;
-	reset();
-	_nmea.clear();
-
-	_i2cPort.stop();
-}
-
-uint8_t	GPSmgr::getDevAddr(){
-	return _i2cPort.getDevAddr();
-};
-
- 
-
-bool  GPSmgr::isConnected() {
-	return _isSetup;
-};
-
-bool GPSmgr::setShouldRead(bool shouldRead){
-	if(_isSetup && _isRunning){
-		_shouldRead = true;
-		return true;
-	}
-	return false;
-}
-
-
-#endif
 
 // MARK: -
 
@@ -387,77 +296,131 @@ string GPSmgr::NavString(char navSystem ){
 }
 
 // MARK: -  GPSReader thread
+#define INDENT_SPACES "  "
+
 
 
 // call then when _nmea.process  is true
-void GPSmgr::processNMEA(){
+void GPSmgr::processNMEA(const char *sentence){
 	
-//	PiCarDB*			db 		= PiCarMgr::shared()->db();
-	string msgID =  string(_nmea.getMessageID());
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now );
 	
+	struct timespec utc;
+	clock_gettime(CLOCK_REALTIME, &utc );
  
-	//  GGA	Global Positioning System Fix Data
-	if( msgID ==  "GGA") {
-		//Global Positioning System Fix Data
-		
-		{
-			long  tmp;
-			time_t now = time(NULL);
-
-			pthread_mutex_lock (&_mutex);
-			memset((void*)&_lastLocation, 0, sizeof(_lastLocation));
-			_lastLocation.isValid = _nmea.isValid();
-			_lastLocation.latitude = _nmea.getLatitude() / 1e6;
-			_lastLocation.longitude = _nmea.getLongitude() / 1e6;
-			_lastLocation.altitudeIsValid = _nmea.getAltitude(tmp);
-			_lastLocation.altitude 		= tmp * 0.001;
-			_lastLocation.navSystem 	= _nmea.getNavSystem();
-			_lastLocation.HDOP 			= _nmea.getHDOP();
-			_lastLocation.numSat 		= _nmea.getNumSatellites();
-			_lastLocation.geoidHeightValid  = _nmea.getGeoidHeight(tmp);
-			_lastLocation.geoidHeight 		= tmp * 0.001;
-			_lastLocation.timestamp = now;
-			pthread_mutex_unlock (&_mutex);
+	switch (minmea_sentence_id(sentence, false)) {
+			
+			//Recommended Minimum
+		case MINMEA_SENTENCE_RMC: {
+			struct minmea_sentence_rmc frame;
+			if (minmea_parse_rmc(&frame, sentence)) {
+				
+				if(frame.valid){
+					
+					pthread_mutex_lock (&_mutex);
+ 					memset((void*)&_lastVelocity, 0, sizeof(_lastVelocity));
+					
+					double heading =  minmea_tofloat(&frame.course);
+					double speed =  minmea_tofloat(&frame.speed);
+					
+					if( !isnan(heading) && !isnan(speed)) {
+						
+						_lastVelocity.heading 	= heading;
+						_lastVelocity.speed 		= speed / 10000;
+						_lastVelocity.isValid 	= 	true;
+						_lastVelocity.timestamp = now;
+						
+						printf("%f mph %f deg\n",  minmea_tofloat(&frame.speed) * 1.150779 , speed);
+					}
+					
+					struct timespec gpsTime;				// GPS time
+					if(minmea_gettime( &gpsTime, &frame.date, &frame.time) == 0){
+						_lastGPSTime.gpsTime = gpsTime;
+						_lastGPSTime.timestamp = now;
+						_lastGPSTime.isValid 	= 	true;
+					}
+					
+					// check against clock */
+					time_t diffSecs = abs( _lastGPSTime.gpsTime.tv_sec - utc.tv_sec);
+					pthread_mutex_unlock (&_mutex);
+					
+					// detect clock difference - -tell piCarMgr
+					if(diffSecs  > 0){
+						
+						printf("clock is off by %ld secs \n",diffSecs);
+						//						PiCarMgr* mgr 		= PiCarMgr::shared();
+						//						mgr->clockNeedsSync(diffSecs, _lastGPSTime.gpsTime);
+					}
+				}
+				
+			} break;
+			
+		case MINMEA_SENTENCE_GGA: {
+			struct minmea_sentence_gga frame;
+			if (minmea_parse_gga(&frame, sentence)) {
+				
+				if(frame.fix_quality >=  1 &&  frame.fix_quality <= 5 ) {
+					pthread_mutex_lock (&_mutex);
+					memset((void*)&_lastLocation, 0, sizeof(_lastLocation));
+					
+					
+					double latitude =  minmea_tocoord(&frame.latitude);
+					double longitude =  minmea_tocoord(&frame.longitude);
+					
+					if( !isnan(latitude) && !isnan(longitude)) {
+						_lastLocation.latitude = latitude;
+						_lastLocation.longitude = longitude;
+						_lastLocation.isValid = true;
+					}
+					
+					double altitude =  minmea_tofloat(&frame.altitude);
+					if( !isnan(altitude) && frame.altitude_units == 'M'){
+						_lastLocation.altitude = altitude  ; // tenths of meter
+						_lastLocation.altitudeIsValid = true;
+						
+						double geoidHeight =  minmea_tofloat(&frame.height);
+						if( !isnan(geoidHeight) && frame.height_units == 'M'){
+							_lastLocation.geoidHeight = geoidHeight * .1;
+							_lastLocation.geoidHeightValid = true;
+						}
+					}
+					
+					double hdop =  minmea_tofloat(&frame.hdop);
+					if( !isnan(hdop)) {
+						_lastLocation.HDOP = int(hdop * 10);
+					}
+					
+					if(sentence[1] == 'G') {
+						_lastLocation.navSystem = sentence[2];
+					}
+					
+					_lastLocation.numSat = frame.satellites_tracked;
+					_lastLocation.timestamp = now;
+					pthread_mutex_unlock (&_mutex);
+				}
+			}
+			
+		} break;
+			
+		default:
+			break;
 			
 		}
-		
 	}
-	else 	if( msgID ==  "RMC") {
-		//Recommended Minimum
-		
-		time_t now = time(NULL);
-
-		pthread_mutex_lock (&_mutex);
-		memset((void*)&_lastVelocity, 0, sizeof(_lastVelocity));
-		_lastVelocity.isValid = _nmea.isValid();
-		_lastVelocity.heading = _nmea.getCourse();
-		_lastVelocity.speed = _nmea.getSpeed()/1000.;
-		_lastVelocity.timestamp = now;
-		pthread_mutex_unlock (&_mutex);
-
-	}
-}
-
-
-static void  UnknownSentenceHandler(MicroNMEA & nmea, void *context){
-//	GPSmgr* d = (GPSmgr*)context;
 	
-//	printf("UNKN |%s|\n", nmea.getSentence());
- 
-	/*
-	 
-	 */
-};
-
+}
+// MARK: -
 
 void GPSmgr::GPSReader(){
-	 
-	_nmea.setUnknownSentenceHandler(UnknownSentenceHandler);
-		
+	
+	
+	char	 buffer[82];
+	size_t buf_used = 0;
+	bool	 wait_for_eol = false;
+
 	while(_isRunning){
 		
-		
-#if USE_SERIAL_GPS
 		// if not setup // check back later
 		if(!_isSetup){
 			sleep(2);
@@ -499,8 +462,31 @@ void GPSmgr::GPSReader(){
 				
 				if(nbytes == 1){
 					readMore = true;
-					if(_nmea.process(c)){
-						processNMEA();
+					
+					if(wait_for_eol){
+						if (c == 0 || c == '\n')
+						{
+							wait_for_eol = false;
+							buf_used = 0;
+							buffer[buf_used] = '\0';
+						}
+						continue;
+ 					}
+					else if(buf_used < sizeof(buffer)){
+							if (c == 0 || c == '\n') {
+								buffer[buf_used++] = '\0';
+								processNMEA(buffer);
+							}
+							else {
+								buffer[buf_used++] = c;
+							}
+					}
+					else {
+						// buffer overflow -- reset
+						wait_for_eol = true;
+						buf_used = 0;
+						buffer[buf_used] = '\0';
+						continue;
 					}
 				}
 				else if( nbytes == 0) {
@@ -529,62 +515,7 @@ void GPSmgr::GPSReader(){
 			
 		}
 		
-#else
-		
-		// if not setup // check back later
-		if(!_shouldRead ){
-			sleep(1);
-			continue;
-		}
 
-#if UBLOX_CURRENT_ADDRESS_READ
-		uint8_t b;
-		
-		if(_i2cPort.readByte(b)){
-			if(b == 0xff){
-				// not ready.. wait a bit
-				usleep(10000);
-			}
-			else {
-				if(_nmea.process(b)){
-					processNMEA();
-				}
-			}
-		}
-		else {
-			ELOG_ERROR(ErrorMgr::FAC_GPS, 0, errno, "GPS I2C READ FAILED");
-			_shouldRead = false;
-		}
-
-#else
- 
-		
-		uint16_t len = 0;
-		if(_i2cPort.readWord(UBLOX_BYTES_AVAIL, len)
-			&& (len > 0) && (len != 0xffff)){
-			
-			for(uint16_t i = 0; i < len; i++){
-				uint8_t b;
-				
-				if(i == 0){
-					if(! _i2cPort.readByte(UBLOX_DATA_STREAM, b)) break;
-				}
-				else {
-					if(! _i2cPort.readByte(b)) break;
-				}
-				
-				if(_nmea.process(b)){
-					processNMEA();
-				}
-			}
-			
-		}
-		else {
-			usleep(1000);
-		}
-		
-#endif
-#endif
 		
 	}
 }

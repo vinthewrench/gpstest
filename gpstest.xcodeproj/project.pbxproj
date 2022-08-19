@@ -7,10 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2E5F7FC928AEE884008E5C89 /* minmea.c in Sources */ = {isa = PBXBuildFile; fileRef = 2E5F7FC728AEE883008E5C89 /* minmea.c */; };
 		2E821056283000A3003D074C /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E821055283000A3003D074C /* main.cpp */; };
 		2E82106028300144003D074C /* ErrorMgr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E82105D28300143003D074C /* ErrorMgr.cpp */; };
-		2E82106128300144003D074C /* I2C.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E82105E28300143003D074C /* I2C.cpp */; };
-		2E8F7081284FC7DB009CC5EA /* MicroNMEA.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E8F707B284FC7DB009CC5EA /* MicroNMEA.cpp */; };
 		2E8F7082284FC7DB009CC5EA /* tranmerc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E8F707E284FC7DB009CC5EA /* tranmerc.cpp */; };
 		2E8F7083284FC7DB009CC5EA /* utm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E8F707F284FC7DB009CC5EA /* utm.cpp */; };
 		2E8F7086284FC7E0009CC5EA /* GPSmgr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E8F7084284FC7E0009CC5EA /* GPSmgr.cpp */; };
@@ -29,16 +28,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2E5F7FC728AEE883008E5C89 /* minmea.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = minmea.c; sourceTree = "<group>"; };
+		2E5F7FC828AEE883008E5C89 /* minmea.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = minmea.h; sourceTree = "<group>"; };
 		2E821052283000A3003D074C /* gpstest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = gpstest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E821055283000A3003D074C /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		2E82105C28300143003D074C /* ErrorMgr.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ErrorMgr.hpp; sourceTree = "<group>"; };
 		2E82105D28300143003D074C /* ErrorMgr.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ErrorMgr.cpp; sourceTree = "<group>"; };
-		2E82105E28300143003D074C /* I2C.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = I2C.cpp; sourceTree = "<group>"; };
-		2E82105F28300143003D074C /* I2C.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = I2C.hpp; sourceTree = "<group>"; };
 		2E82106528300328003D074C /* CommonDefs.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CommonDefs.hpp; sourceTree = "<group>"; };
 		2E821066283003D3003D074C /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
-		2E8F707B284FC7DB009CC5EA /* MicroNMEA.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MicroNMEA.cpp; sourceTree = "<group>"; };
-		2E8F707C284FC7DB009CC5EA /* MicroNMEA.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = MicroNMEA.hpp; sourceTree = "<group>"; };
 		2E8F707D284FC7DB009CC5EA /* tranmerc.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tranmerc.hpp; sourceTree = "<group>"; };
 		2E8F707E284FC7DB009CC5EA /* tranmerc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tranmerc.cpp; sourceTree = "<group>"; };
 		2E8F707F284FC7DB009CC5EA /* utm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = utm.cpp; sourceTree = "<group>"; };
@@ -82,16 +79,14 @@
 				2E82106528300328003D074C /* CommonDefs.hpp */,
 				2E82105D28300143003D074C /* ErrorMgr.cpp */,
 				2E82105C28300143003D074C /* ErrorMgr.hpp */,
-				2E82105E28300143003D074C /* I2C.cpp */,
-				2E82105F28300143003D074C /* I2C.hpp */,
-				2E8F707B284FC7DB009CC5EA /* MicroNMEA.cpp */,
-				2E8F707C284FC7DB009CC5EA /* MicroNMEA.hpp */,
+				2E8F7084284FC7E0009CC5EA /* GPSmgr.cpp */,
+				2E8F7085284FC7E0009CC5EA /* GPSmgr.hpp */,
+				2E5F7FC728AEE883008E5C89 /* minmea.c */,
+				2E5F7FC828AEE883008E5C89 /* minmea.h */,
 				2E8F707E284FC7DB009CC5EA /* tranmerc.cpp */,
 				2E8F707D284FC7DB009CC5EA /* tranmerc.hpp */,
 				2E8F707F284FC7DB009CC5EA /* utm.cpp */,
 				2E8F7080284FC7DB009CC5EA /* utm.hpp */,
-				2E8F7084284FC7E0009CC5EA /* GPSmgr.cpp */,
-				2E8F7085284FC7E0009CC5EA /* GPSmgr.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";
@@ -152,10 +147,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2E5F7FC928AEE884008E5C89 /* minmea.c in Sources */,
 				2E8F7083284FC7DB009CC5EA /* utm.cpp in Sources */,
-				2E82106128300144003D074C /* I2C.cpp in Sources */,
 				2E8F7082284FC7DB009CC5EA /* tranmerc.cpp in Sources */,
-				2E8F7081284FC7DB009CC5EA /* MicroNMEA.cpp in Sources */,
 				2E821056283000A3003D074C /* main.cpp in Sources */,
 				2E82106028300144003D074C /* ErrorMgr.cpp in Sources */,
 				2E8F7086284FC7E0009CC5EA /* GPSmgr.cpp in Sources */,

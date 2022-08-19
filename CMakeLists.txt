@@ -11,11 +11,10 @@ find_package(Threads)
 set(SOURCES
 	src/main.cpp
 	src/GPSmgr.cpp
-	src/MicroNMEA.cpp
+	src/minmea.cpp
 	src/tranmerc.cpp
 	src/utm.cpp
-	src/I2C.cpp
-	src/ErrorMgr.cpp
+ 	src/ErrorMgr.cpp
 	)
 
  
