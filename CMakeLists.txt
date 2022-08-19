@@ -11,7 +11,7 @@ find_package(Threads)
 set(SOURCES
 	src/main.cpp
 	src/GPSmgr.cpp
-	src/minmea.cpp
+	src/minmea.c
 	src/tranmerc.cpp
 	src/utm.cpp
  	src/ErrorMgr.cpp
