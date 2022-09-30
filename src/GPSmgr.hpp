@@ -20,17 +20,67 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <pthread.h>
- 
+#include <utility>      // std::pair, std::make_pair
+
+
 #include <termios.h>
 #include <sys/time.h>
 
  #include "ErrorMgr.hpp"
 #include "CommonDefs.hpp"
-#include "minmea.h"
-
-
-
 using namespace std;
+
+#define MSG_UBX 1
+
+#if MSG_UBX
+
+class UBX_checksum{
+public:
+	UBX_checksum() { reset();};
+	
+	inline  void reset(){ _CK_A = 0; _CK_B = 0; };
+	void 		add(uint8_t c);
+	bool 		validate(uint8_t A, uint8_t B);
+	
+private:
+	
+	uint8_t  	_CK_A;
+	uint8_t  	_CK_B;
+};
+
+
+#else
+#include "minmea.h"
+#endif
+ 
+
+
+class dbuf{
+	
+public:
+	dbuf();
+	~dbuf();
+
+	bool append_data(void* data, size_t len);
+	
+	inline bool   append_char(uint8_t c){
+	  return append_data(&c, 1);
+	}
+	
+	inline  void reset(){ _pos = 0; _used = 0; };
+
+	size_t size() { return _used;};
+	uint8_t *data () { return _data;};
+	
+private:
+	
+	size_t  	_pos;			// cursor pos
+	size_t  	_used;			// actual end of buffer
+	size_t  	_alloc;
+	uint8_t*  _data;
+
+};
+
 
 typedef double GPSLocationDegrees;    //   degrees
 typedef double  GPSLocationDistance;	// distance in meters.
@@ -63,33 +113,18 @@ typedef struct {
 		>20		Poor			At this level, measurements are inaccurate by as much as 300 meters with a 6 meter
 		accurate device (50 DOP × 6 meters) and should be discarded.
 		*/
-
-  char 					navSystem;			 // navigation system
-	/*
-	 navigation systems
-	 `N` = GNSS   		Mix
-	 `P` = GPS				US
-	 `L` = GLONASS		RU
-	 `A` = Galileo		EU
-	 `\0` = none
-	  */
   
   uint8_t 						numSat;			// number of satellites for fix
-  
-  GPSLocationDistance		geoidHeight;  //height above WGS84 Geoid
-  
   bool isValid;
   bool altitudeIsValid;
-  bool geoidHeightValid;
-
 } GPSLocation_t;
 
 
 typedef struct {
-  double 					speed;
-  double					heading;
-  struct timespec		timestamp;	//local timestamp of reading
-  bool						 isValid;
+  double 					speed;		// knots 
+  double						heading;
+  struct timespec			timestamp;	//local timestamp of reading
+  bool						isValid;
 } GPSVelocity_t;
 
 typedef struct {
@@ -105,7 +140,6 @@ public:
 	GPSmgr();
 	~GPSmgr();
 	
-	
 	bool begin(const char* path = "/dev/ttyAMA0", speed_t speed =  B9600);
 	bool begin(const char* path, speed_t speed, int &error);
 
@@ -114,14 +148,20 @@ public:
 	bool reset();
 	bool isConnected() ;
 
+	bool shouldSetLocalTime() { return _shouldSetLocalTime; };
+	void resetShouldSetLocalTime();
+ 
 	bool GetLocation(GPSLocation_t& location);
 	static string UTMString(GPSLocation_t location);
 	static string NavString(char navSystem );
 	
 	bool GetVelocity(GPSVelocity_t & velocity);
 	
+	static pair<double,double> dist_bearing(GPSLocation_t p1, GPSLocation_t p2);
 	
-	
+	static string headingStringFromHeading(double  heading); // "N ","NE","E ", "SE","S ","SW","W ","NW"
+
+ 
 private:
 	bool 				_isSetup = false;
 	GPSLocation_t	_lastLocation;
@@ -139,14 +179,22 @@ private:
 	  int					_max_fds;
 	  int	 				_fd;
  
+#if MSG_UBX
+	void processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
+						 u_int8_t *buffer, size_t length);
+#else
 	void processNMEA(const char *sentence);
+#endif
  
+	
 	void GPSReader();		// C++ version of thread
 	// C wrappers for GPSReader;
 	static void* GPSReaderThread(void *context);
 	static void GPSReaderThreadCleanup(void *context);
 	bool 			_isRunning = false;
- 
+	bool			_shouldSetLocalTime = false;
+	
+
   pthread_cond_t 		_cond = PTHREAD_COND_INITIALIZER;
   pthread_mutex_t 	_mutex = PTHREAD_MUTEX_INITIALIZER;
   pthread_t				_TID;
