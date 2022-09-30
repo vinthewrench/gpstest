@@ -56,6 +56,9 @@ int main(int argc, const char * argv[]) {
 		if(!_gps.begin(path_gps, B38400, error))
 			throw Exception("failed to setup GPS.  error: %d", error);
 
+		
+		printf("debug in UBX mode\n");
+		
 		GPSLocation_t here;
 		
 		while(true){

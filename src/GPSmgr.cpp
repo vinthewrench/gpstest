@@ -654,10 +654,7 @@ void GPSmgr::processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 					
 				}
 				
-				printf("UBX: (%02x,%02x) %zu \n", ubx_class, ubx_id, length);
-				dumpHex(buffer, length, 0); printf("\n");
-
-	 			break;
+ 	 			break;
 				
 			default:
 				
