@@ -791,6 +791,7 @@ void GPSmgr::GPSReader(){
 		STATE_LEN2,
 		STATE_PAYLOAD,
 		STATE_CHECKSUM,
+		STATE_NMEA,
 		STATE_ERROR
 	}ubx_state_t;
 	
@@ -858,7 +859,28 @@ void GPSmgr::GPSReader(){
 	  						ubx_payload_offset = 0;
 							checksum.reset();
 							ubx_state = STATE_SYNC;
-		 				}
+						}
+						else if (c == '$'){
+							ubx_state = STATE_NMEA;
+							buff.reset();
+							buff.append_char(c);
+						}
+						break;
+					
+					case STATE_NMEA:
+					{
+						if(c == '\r') break;
+						if(c ==  '\n') {
+							buff.append_char(0);
+							printf("NMEA: |%s|\n", buff.data());
+							buff.reset();
+							ubx_state = STATE_INIT;
+ 						}
+						else
+						{
+							buff.append_char(c);
+						}
+					}
 						break;
 						
 					case  STATE_SYNC:
