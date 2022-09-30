@@ -845,6 +845,8 @@ void GPSmgr::GPSReader(){
 			
 			if(nbytes == 1){
 				
+				printf("%02x |%c|\n", c,c );
+				
 #if MSG_UBX
 				switch (ubx_state) {
 						
