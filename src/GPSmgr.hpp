@@ -26,14 +26,13 @@
 #include <termios.h>
 #include <sys/time.h>
 
- #include "ErrorMgr.hpp"
+#include "ErrorMgr.hpp"
 #include "CommonDefs.hpp"
+#include "minmea.h"
+
 using namespace std;
 
-#define MSG_UBX 1
-
-#if MSG_UBX
-
+ 
 class UBX_checksum{
 public:
 	UBX_checksum() { reset();};
@@ -47,13 +46,7 @@ private:
 	uint8_t  	_CK_A;
 	uint8_t  	_CK_B;
 };
-
-
-#else
-#include "minmea.h"
-#endif
  
-
 
 class dbuf{
 	
@@ -92,7 +85,7 @@ typedef struct {
   
   struct timespec			timestamp;			//local CLOCK_MONOTONIC timestamp of reading
   
-  uint8_t						HDOP;   // dilution of precision (HDOP), in tenths
+  uint8_t						DOP;   // dilution of precision (DDOP), in tenths
 
 	  /* DOP Value	Rating	Description
 		1			Ideal			This is the highest possible confidence level to be used for applications
@@ -148,20 +141,19 @@ public:
 	bool reset();
 	bool isConnected() ;
 
-	bool shouldSetLocalTime() { return _shouldSetLocalTime; };
-	void resetShouldSetLocalTime();
- 
+	typedef std::function<void(time_t deviation,  struct timespec gpsTime)> timeSyncCallback_t;
+	void setTimeSyncCallback(timeSyncCallback_t cb) { _timeSyncCB = cb;};
+	
 	bool GetLocation(GPSLocation_t& location);
 	static string UTMString(GPSLocation_t location);
-	static string NavString(char navSystem );
-	
+ 
 	bool GetVelocity(GPSVelocity_t & velocity);
 	
 	static pair<double,double> dist_bearing(GPSLocation_t p1, GPSLocation_t p2);
 	
 	static string headingStringFromHeading(double  heading); // "N ","NE","E ", "SE","S ","SW","W ","NW"
 
- 
+
 private:
 	bool 				_isSetup = false;
 	GPSLocation_t	_lastLocation;
@@ -179,12 +171,10 @@ private:
 	  int					_max_fds;
 	  int	 				_fd;
  
-#if MSG_UBX
-	void processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
+ 	void processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 						 u_int8_t *buffer, size_t length);
-#else
-	void processNMEA(const char *sentence);
-#endif
+	
+ 	void processNMEA(u_int8_t *buffer, size_t length);
  
 	
 	void GPSReader();		// C++ version of thread
@@ -194,6 +184,7 @@ private:
 	bool 			_isRunning = false;
 	bool			_shouldSetLocalTime = false;
 	
+	timeSyncCallback_t _timeSyncCB = NULL;
 
   pthread_cond_t 		_cond = PTHREAD_COND_INITIALIZER;
   pthread_mutex_t 	_mutex = PTHREAD_MUTEX_INITIALIZER;

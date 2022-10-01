@@ -56,8 +56,9 @@ int main(int argc, const char * argv[]) {
 		if(!_gps.begin(path_gps, B38400, error))
 			throw Exception("failed to setup GPS.  error: %d", error);
 
-		
-		printf("debug in UBX mode\n");
+ 		_gps.setTimeSyncCallback([=](time_t deviation, struct timespec gpsTime){
+			printf("clock is off by %hu secs \n",deviation);
+			} );
 		
 		GPSLocation_t here;
 		
@@ -68,7 +69,7 @@ int main(int argc, const char * argv[]) {
 
 				constexpr double  M2FT = 	3.2808399;
 
-				printf("%-10s: %-2.1f \n", "PDOP", here.HDOP/10.);
+				printf("%-10s: %-2.1f \n", "DOP", here.DOP/10.);
 				printf("%-10s: %-3d \n", "Sats", here.numSat);
 	
 				printf("%-10s: (%3.5f, %3.5f)\n", "LAT/LONG", here.latitude,here.longitude);

@@ -29,8 +29,7 @@ typedef void * (*THREADFUNCPTR)(void *);
 
 // MARK: -  ubx_checksum
 
-#if MSG_UBX
-void UBX_checksum::add(uint8_t c){
+ void UBX_checksum::add(uint8_t c){
 	 _CK_A += c;
 	 _CK_B += _CK_A;
 	 
@@ -41,8 +40,7 @@ bool UBX_checksum::validate(uint8_t A, uint8_t B){
 	return (A == _CK_A && B == _CK_B);
   }
 
-#endif
-
+ 
 // MARK: -  Dbuf
 
 #define ALLOC_QUANTUM 16
@@ -289,19 +287,13 @@ bool GPSmgr::reset(){
 	pthread_mutex_lock (&_mutex);
 	_lastLocation.isValid = false;
 	_lastLocation.altitude = false;
-	_lastLocation.HDOP = 255;
+	_lastLocation.DOP = 255;
 	_shouldSetLocalTime = false;
 	pthread_mutex_unlock (&_mutex);
 	return true;
 }
  
-
-void GPSmgr::resetShouldSetLocalTime() {
-	pthread_mutex_lock (&_mutex);
-	_shouldSetLocalTime = false;
-	pthread_mutex_unlock (&_mutex);
- };
-
+ 
 bool	GPSmgr::GetLocation(GPSLocation_t & location){
  
 	bool success = false;
@@ -358,19 +350,6 @@ string GPSmgr::UTMString(GPSLocation_t location){
 	return str;
 	
 }
-
-string GPSmgr::NavString(char navSystem ){
-	string str = string();
-	switch(navSystem){
-		case 'N' : str = "GNSS"; break;
-		case 'P' : str = "GPS"; break;
-		case 'L' : str = "GLONASS"; break;
-		case 'A' : str = "Galileo"; break;
-		default: break;
-	}
-	
-	return str;
-}
  
 
 string GPSmgr::headingStringFromHeading(double	 heading){
@@ -423,9 +402,7 @@ pair<double,double>  GPSmgr::dist_bearing(GPSLocation_t p1, GPSLocation_t p2){
 }
 
 // MARK: -  UBX decode
-
-#if MSG_UBX
-
+ 
 #define DEBUG_UBX 1
 
 // little endian copy
@@ -498,68 +475,12 @@ void GPSmgr::processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 	if( ubx_class == 0x01) {
  
 		switch (ubx_id) {
-#if 0
-			case 0x02:		 //	UBX-NAV-POSLLH (0x01 0x02)  28 bytes
-			if(length == 28) {
-				struct NAV_POSLLH {
- 				  uint32_t iTOW;
-				  long lon;
-				  long lat;
-				  long height;
-				  long hMSL;
-					uint32_t hAcc;
-					uint32_t vAcc;
-				} s ;
-
-				// little endian copy
-				s.iTOW = *((uint32_t*) &buffer[0]);
-				s.lon = *((int32_t*) &buffer[4]);
-				s.lat = *((int32_t*) &buffer[8]);
-				s.height = *((int32_t*) &buffer[12]);
-				s.hMSL = *((int32_t*) &buffer[16]);
- 				s.hAcc = *((uint32_t*) &buffer[20]);
-				s.vAcc = *((uint32_t*) &buffer[24]);
-
-//				pthread_mutex_lock (&_mutex);
-//				_lastLocation.latitude = s.lat * 1e-7;
-//				_lastLocation.longitude =  s.lon * 1e-7;
-//				_lastLocation.altitude = s.hMSL  * 1e-3;
-//				_lastLocation.altitudeIsValid = true;
-//
-//				_lastLocation.timestamp = now;
-// 				_lastLocation.isValid = true;
-//				pthread_mutex_unlock (&_mutex);
-  			}
-	 		break;
-#endif
-
-#if 0
-			case 0x03:		 //	UBX-NAV-STATUS (0x01 0x03)  16 bytes
-			if(length == 16) {
-
-				struct NAV_STATUS {
-				  uint32_t iTOW;
-				  uint8_t gpsFix;
-
-					uint32_t ttff; //	 Time to first fix (millisecond time tag)
-					uint32_t msss; //	 Milliseconds since Startup / Reset
- 				} s ;
-
-				// little endian copy
-				s.iTOW = *((uint32_t*) &buffer[0]);
-				s.gpsFix =  buffer[4];
-				s.ttff = *((uint32_t*) &buffer[8]);
-				s.msss = *((uint32_t*) &buffer[12]);
-
-				printf("GPSfix: %02x\n", s.gpsFix );
-			}
-				break;
-
-#endif
-
+				
 			case 0x07:		 //	UBX-NAV-PVT (0x01 0x07)
 				if(length == 92) {
-					
+// 					printf(" process UBX-NAV-PVT (0x01 0x07)\n");
+
+					bool gotTime = false;
 		//				uint32_t iTOW  	= TO_U32(buffer, 0);
 					uint16_t year 		= TO_U16(buffer,4);
 					uint8_t month 		= TO_U8(buffer,6);
@@ -616,12 +537,7 @@ void GPSmgr::processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 							_lastGPSTime.gpsTime = gpsTime;
 							_lastGPSTime.timestamp = now;
 							_lastGPSTime.isValid 	= 	true;
-							// check against clock */
-							time_t diffSecs = abs( _lastGPSTime.gpsTime.tv_sec - utc.tv_sec);
-							if( diffSecs  > 1){
-								_shouldSetLocalTime = true;
- 		//						printf("clock is off by %ld secs \n",diffSecs);
- 							}
+							gotTime = true;
 						}
 					}
 					
@@ -638,7 +554,7 @@ void GPSmgr::processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 						}
  					}
 					
-					_lastLocation.HDOP = pDOP * 0.01;
+					_lastLocation.DOP = pDOP * 0.01;
 					_lastLocation.numSat = numSV;
 					_lastLocation.timestamp = now;
 					 
@@ -652,6 +568,18 @@ void GPSmgr::processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 	 
 					pthread_mutex_unlock (&_mutex);
 					
+					if(gotTime){
+						// check against clock */
+						
+						time_t diffSecs = abs( _lastGPSTime.gpsTime.tv_sec - utc.tv_sec);
+						pthread_mutex_unlock (&_mutex);
+						
+						// detect clock difference
+						if(diffSecs  > 1){
+							if(_timeSyncCB)
+								(_timeSyncCB)(diffSecs,_lastGPSTime.gpsTime );
+						}
+					}
 				}
 				
  	 			break;
@@ -669,12 +597,11 @@ void GPSmgr::processUBX(u_int8_t ubx_class, u_int8_t ubx_id,
 	
 }
 
-
-#else
+ 
 // MARK: -  NMEA decode
  
 // call then when _nmea.process  is true
-void GPSmgr::processNMEA(const char *sentence){
+void GPSmgr:: processNMEA(u_int8_t *buffer, size_t length)  {
 	
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now );
@@ -682,6 +609,8 @@ void GPSmgr::processNMEA(const char *sentence){
 	struct timespec utc;
 	clock_gettime(CLOCK_REALTIME, &utc );
  
+	const char*  sentence =  (const char* )(buffer);
+	
 	switch (minmea_sentence_id(sentence, false)) {
 			
 			//Recommended Minimum
@@ -691,6 +620,8 @@ void GPSmgr::processNMEA(const char *sentence){
 				
 				if(frame.valid){
 					
+//					printf(" process MINMEA_SENTENCE_RMC\n");
+
 					pthread_mutex_lock (&_mutex);
  					memset((void*)&_lastVelocity, 0, sizeof(_lastVelocity));
 					
@@ -704,25 +635,30 @@ void GPSmgr::processNMEA(const char *sentence){
 						_lastVelocity.isValid 	= 	true;
 						_lastVelocity.timestamp = now;
 						
-  						printf("%f mph %f deg\n",  minmea_tofloat(&frame.speed) * 1.15078 , heading);
+//  						printf("%f mph %f deg\n",  minmea_tofloat(&frame.speed) * 1.15078 , heading);
 					}
+					
+					bool gotTime = false;
 					
 					struct timespec gpsTime;				// GPS time
 					if(minmea_gettime( &gpsTime, &frame.date, &frame.time) == 0){
 						_lastGPSTime.gpsTime = gpsTime;
 						_lastGPSTime.timestamp = now;
 						_lastGPSTime.isValid 	= 	true;
+						gotTime = true;
 					}
 					
-					// check against clock */
-					time_t diffSecs = abs( _lastGPSTime.gpsTime.tv_sec - utc.tv_sec);
-					pthread_mutex_unlock (&_mutex);
-					
-					// detect clock difference - -tell piCarMgr
-					if(diffSecs  > 0){
-						_shouldSetLocalTime = true;
-
-	//					printf("clock is off by %ld secs \n",diffSecs);
+					if(gotTime){
+						// check against clock */
+						
+						time_t diffSecs = abs( _lastGPSTime.gpsTime.tv_sec - utc.tv_sec);
+						pthread_mutex_unlock (&_mutex);
+						
+						// detect clock difference
+						if(diffSecs  > 1){
+							if(_timeSyncCB)
+								(_timeSyncCB)(diffSecs,_lastGPSTime.gpsTime );
+						}
 					}
 				}
 				
@@ -732,6 +668,8 @@ void GPSmgr::processNMEA(const char *sentence){
 			struct minmea_sentence_gga frame;
 			if (minmea_parse_gga(&frame, sentence)) {
 				
+	//			printf(" process MINMEA_SENTENCE_GGA\n");
+
 				if(frame.fix_quality >=  1 &&  frame.fix_quality <= 5 ) {
 					pthread_mutex_lock (&_mutex);
 					memset((void*)&_lastLocation, 0, sizeof(_lastLocation));
@@ -754,7 +692,7 @@ void GPSmgr::processNMEA(const char *sentence){
 					
 					double hdop =  minmea_tofloat(&frame.hdop);
 					if( !isnan(hdop)) {
-						_lastLocation.HDOP = int(hdop * 10);
+						_lastLocation.DOP = int(hdop * 10);
 					}
  
 					_lastLocation.numSat = frame.satellites_tracked;
@@ -772,8 +710,7 @@ void GPSmgr::processNMEA(const char *sentence){
 	}
 	
 }
- #endif
-
+  
 
 // MARK: -  GPSReader thread
 
@@ -781,8 +718,7 @@ void GPSmgr::GPSReader(){
  
 	dbuf   buff;
 	
-#if MSG_UBX
-	typedef enum  {
+ 	typedef enum  {
 		STATE_INIT = 0,
  		STATE_SYNC,
  		STATE_CLASS,
@@ -805,8 +741,7 @@ void GPSmgr::GPSReader(){
 	
  	uint16_t		ubx_payload_offset = 0;
  
-#endif
-	
+ 
 	while(_isRunning){
 		
 		// if not setup // check back later
@@ -826,14 +761,14 @@ void GPSmgr::GPSReader(){
 		}
 		
 		/* wait for something to happen on the socket */
-		struct timeval selTimeout;
-		selTimeout.tv_sec = 0;       /* timeout (secs.) */
-		selTimeout.tv_usec = 1000;            /* 100 microseconds */
+//		struct timeval selTimeout;
+//		selTimeout.tv_sec = 0;       /* timeout (secs.) */
+//		selTimeout.tv_usec = 1000;            /* 100 microseconds */
 		
 		/* back up master */
 		fd_set dup = _master_fds;
 		
-		int numReady = select(_max_fds+1, &dup, NULL, NULL, &selTimeout);
+		int numReady = select(_max_fds+1, &dup, NULL, NULL, NULL); // &selTimeout);
 		if( numReady == -1 ) {
 			perror("select");
 		}
@@ -846,8 +781,6 @@ void GPSmgr::GPSReader(){
 			
 			if(nbytes == 1){
 				
-	 
-#if MSG_UBX
 				switch (ubx_state) {
 						
 					case  STATE_INIT:
@@ -855,7 +788,7 @@ void GPSmgr::GPSReader(){
 							ubx_class = 0;
 							ubx_id	 = 0;
 							ubx_length = 0;
-	  						ubx_payload_offset = 0;
+							ubx_payload_offset = 0;
 							checksum.reset();
 							ubx_state = STATE_SYNC;
 						}
@@ -865,16 +798,17 @@ void GPSmgr::GPSReader(){
 							buff.append_char(c);
 						}
 						break;
-					
+						
 					case STATE_NMEA:
 					{
 						if(c == '\r') break;
 						if(c ==  '\n') {
 							buff.append_char(0);
-							printf("NMEA: |%s|\n", buff.data());
+							processNMEA(buff.data(),buff.size());
+		 
 							buff.reset();
 							ubx_state = STATE_INIT;
- 						}
+						}
 						else
 						{
 							buff.append_char(c);
@@ -888,20 +822,20 @@ void GPSmgr::GPSReader(){
 						}
 						else
 							ubx_state = STATE_INIT;
- 						break;
-
+						break;
+						
 					case  STATE_CLASS:
 						ubx_class = c;
 						checksum.add(c);
 						ubx_state = STATE_ID;
 						break;
-
+						
 					case  STATE_ID:
 						ubx_id = c;
 						checksum.add(c);
 						ubx_state = STATE_LEN1;
 						break;
-
+						
 					case  STATE_LEN1:
 						ubx_length = c;
 						checksum.add(c);
@@ -911,54 +845,37 @@ void GPSmgr::GPSReader(){
 					case  STATE_LEN2:
 						ubx_length |= ((uint16_t) c) << 8;
 						checksum.add(c);
- 	 					ubx_state = STATE_PAYLOAD;
+						ubx_state = STATE_PAYLOAD;
 						buff.reset();
 						break;
-	
+						
 					case STATE_PAYLOAD:
 						if(buff.size() < ubx_length){
-	 						buff.append_char(c);
+							buff.append_char(c);
 							checksum.add(c);
- 						}
+						}
 						else {
 							ubx_chk[0] = c;
-	 						ubx_state = STATE_CHECKSUM;
- 						}
+							ubx_state = STATE_CHECKSUM;
+						}
 						break;
 						
 					case STATE_CHECKSUM:
 					{
 						ubx_chk[1] = c;
- 
-						if( checksum.validate(ubx_chk[0], ubx_chk[1])) {
-	 						processUBX(ubx_class, ubx_id, buff.data(),buff.size());
-	 						ubx_state	= STATE_INIT;
- 						}
- 					}
 						
-					 break;
-								 
+						if( checksum.validate(ubx_chk[0], ubx_chk[1])) {
+							processUBX(ubx_class, ubx_id, buff.data(),buff.size());
+							ubx_state	= STATE_INIT;
+						}
+					}
+						
+						break;
+						
 					default:
-							break;
+						break;
 				}
-
-#else
-				if(c == '\r') continue;
 				
-				if (c == 0 || c == '\n'){
-					
-					buff.append_char('\0');
-				 
-//					printf("%s\n", buffer);
-					processNMEA((const char*) buff.data());
-					
-					buff.reset();
-					 
-				}else {
-					
-					buff.append_char(c);
-				}
-#endif
 			}
 			else if( nbytes == 0) {
 				continue;
